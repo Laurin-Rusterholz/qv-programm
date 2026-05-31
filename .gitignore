@@ -3,8 +3,9 @@
 __pycache__/
 *.pyc
 
-# Geheimer API-Schluessel - niemals hochladen
+# Geheime Werte - niemals hochladen
 .env
+.streamlit/secrets.toml
 
 # Inhalte der Arbeitsordner nicht ins Git aufnehmen,
 # die Ordner selbst aber behalten.

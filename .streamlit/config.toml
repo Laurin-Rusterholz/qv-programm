@@ -1,0 +1,13 @@
+# Streamlit-Konfiguration fuer den QV-Pruefungsassistenten.
+
+[browser]
+# Keine Nutzungsstatistik/Telemetrie senden.
+gatherUsageStats = false
+
+[server]
+# Maximale Upload-Groesse pro Datei in MB.
+maxUploadSize = 50
+
+[theme]
+base = "light"
+primaryColor = "#1f6feb"

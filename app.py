@@ -49,6 +49,13 @@ MODELL_OPTIONEN = {
     "Beste Qualitaet (Opus 4.8)": "claude-opus-4-8",
 }
 
+# Preise in US-Dollar pro 1 Million Tokens (Eingabe, Ausgabe) - fuer die grobe
+# Kostenanzeige. Stand der offiziellen Anthropic-Preisliste.
+PREISE_PRO_MIO = {
+    "claude-sonnet-4-6": (3.0, 15.0),
+    "claude-opus-4-8": (5.0, 25.0),
+}
+
 # Lange Loesungen sollen vollstaendig sein.
 MAX_TOKENS = 8000
 
@@ -486,11 +493,18 @@ def text_aus_bloecken(bloecke):
     return "\n".join(teile).strip()
 
 
+def geschaetzte_kosten(modell, input_tokens, output_tokens):
+    """Grobe Kostenschaetzung in US-Dollar fuer einen Verbrauch."""
+    ein, aus = PREISE_PRO_MIO.get(modell, (3.0, 15.0))
+    return (input_tokens / 1_000_000) * ein + (output_tokens / 1_000_000) * aus
+
+
 def fuehre_konversation(client, modell, messages, status_callback=None):
     """Fuehrt die Werkzeug-Schleife (inkl. Selbstkorrektur) aus.
 
     messages wird dabei direkt erweitert (voller Verlauf bleibt erhalten).
-    Rueckgabe: (antwort_text, neue_dateien).
+    Rueckgabe: (antwort_text, neue_dateien, verbrauch) mit
+    verbrauch = {"input": int, "output": int}.
     """
     def melde(text):
         if status_callback:
@@ -499,9 +513,21 @@ def fuehre_konversation(client, modell, messages, status_callback=None):
             except Exception:
                 pass
 
+    def zaehle(antwort):
+        nutzung = getattr(antwort, "usage", None)
+        if not nutzung:
+            return
+        verbrauch["input"] += (
+            (getattr(nutzung, "input_tokens", 0) or 0)
+            + (getattr(nutzung, "cache_read_input_tokens", 0) or 0)
+            + (getattr(nutzung, "cache_creation_input_tokens", 0) or 0)
+        )
+        verbrauch["output"] += getattr(nutzung, "output_tokens", 0) or 0
+
     neue_dateien = []
     fehler_anzahl = 0
     letzter_text = ""
+    verbrauch = {"input": 0, "output": 0}
 
     system_param = [
         {
@@ -520,6 +546,7 @@ def fuehre_konversation(client, modell, messages, status_callback=None):
             tools=TOOLS,
             messages=messages,
         )
+        zaehle(antwort)
 
         # Antwort der KI in den Verlauf aufnehmen.
         messages.append(
@@ -530,7 +557,7 @@ def fuehre_konversation(client, modell, messages, status_callback=None):
             letzter_text = text
 
         if antwort.stop_reason != "tool_use":
-            return letzter_text, neue_dateien
+            return letzter_text, neue_dateien, verbrauch
 
         # Die KI moechte das Datei-Werkzeug benutzen.
         tool_ergebnisse = []
@@ -610,6 +637,7 @@ def fuehre_konversation(client, modell, messages, status_callback=None):
                     tools=TOOLS,
                     messages=messages,
                 )
+                zaehle(abschluss)
                 messages.append(
                     {
                         "role": "assistant",
@@ -626,12 +654,12 @@ def fuehre_konversation(client, modell, messages, status_callback=None):
                     "Die Datei konnte nach mehreren Versuchen nicht erstellt werden. "
                     "Bitte formuliere die Aufgabe etwas anders oder versuche es erneut."
                 )
-            return letzter_text, neue_dateien
+            return letzter_text, neue_dateien, verbrauch
 
     # Sicherheitsobergrenze erreicht.
     if not letzter_text:
         letzter_text = "Die KI hat keine abschliessende Antwort geliefert. Bitte erneut versuchen."
-    return letzter_text, neue_dateien
+    return letzter_text, neue_dateien, verbrauch
 
 
 def bereinige_verlauf(messages):
@@ -706,6 +734,123 @@ def zeige_download_knopf(dateiname, key):
     )
 
 
+def _secret_oder_none(name):
+    """Liest einen Wert aus st.secrets, ohne zu crashen, wenn keine secrets.toml existiert."""
+    try:
+        if name in st.secrets:
+            return st.secrets[name]
+    except Exception:
+        return None
+    return None
+
+
+def hole_api_key_aus_quellen():
+    """API-Schluessel aus st.secrets (Cloud) oder Umgebung/.env (lokal)."""
+    aus_secret = _secret_oder_none("ANTHROPIC_API_KEY")
+    if aus_secret:
+        return str(aus_secret)
+    return os.environ.get("ANTHROPIC_API_KEY", "")
+
+
+def pruefe_passwort():
+    """Optionaler Passwortschutz fuer den Online-Betrieb.
+
+    Aktiv, sobald APP_PASSWORT in den Secrets oder der Umgebung gesetzt ist.
+    Ohne gesetztes Passwort ist die App offen (lokaler Betrieb).
+    Rueckgabe True, wenn der Zugang frei ist.
+    """
+    erwartet = _secret_oder_none("APP_PASSWORT") or os.environ.get("APP_PASSWORT")
+    if not erwartet:
+        return True
+    if st.session_state.get("_zugang_ok"):
+        return True
+
+    st.title("🔒 QV-Pruefungsassistent")
+    st.write("Diese App ist passwortgeschuetzt. Bitte Passwort eingeben.")
+    pw = st.text_input("Passwort", type="password")
+    if st.button("Anmelden"):
+        if pw == str(erwartet):
+            st.session_state["_zugang_ok"] = True
+            st.rerun()
+        else:
+            st.error("Falsches Passwort.")
+    return False
+
+
+def _dateien_im_ordner(ordner, ausnahmen=()):
+    """Sortierte Liste sichtbarer Dateien in einem Ordner."""
+    if not ordner.exists():
+        return []
+    return [
+        p
+        for p in sorted(ordner.iterdir())
+        if p.is_file() and not p.name.startswith(".") and p.name not in ausnahmen
+    ]
+
+
+def verwalte_theorie():
+    """Sidebar-Bereich: Theorie-Dateien hochladen, ansehen, loeschen."""
+    with st.sidebar.expander("📚 Theorie-Dateien", expanded=False):
+        st.caption(
+            "Wird nur genutzt, wenn deine Nachricht das Wort «Theorie» enthaelt."
+        )
+        neu = st.file_uploader(
+            "Theorie hinzufuegen",
+            accept_multiple_files=True,
+            key="theorie_upload",
+            label_visibility="collapsed",
+        )
+        if neu:
+            for datei in neu:
+                ziel = THEORIE_DIR / sicherer_dateiname(datei.name)
+                daten = datei.getvalue()
+                try:
+                    if (not ziel.exists()) or ziel.stat().st_size != len(daten):
+                        ziel.write_bytes(daten)
+                except OSError:
+                    pass
+        dateien = _dateien_im_ordner(THEORIE_DIR, ausnahmen=("LIESMICH.txt",))
+        if dateien:
+            for i, pfad in enumerate(dateien):
+                c1, c2 = st.columns([5, 1])
+                c1.write(pfad.name)
+                if c2.button("🗑", key=f"theo_del_{i}", help="loeschen"):
+                    pfad.unlink(missing_ok=True)
+                    st.rerun()
+        else:
+            st.caption("Noch keine Theorie-Dateien.")
+
+
+def verwalte_outputs():
+    """Sidebar-Bereich: alle erstellten Dateien auflisten, herunterladen, loeschen."""
+    with st.sidebar.expander("📂 Erstellte Dateien", expanded=False):
+        dateien = _dateien_im_ordner(OUTPUT_DIR)
+        if not dateien:
+            st.caption("Noch keine Dateien erstellt.")
+            return
+        for i, pfad in enumerate(dateien):
+            zeige_download_knopf(pfad.name, key=f"side_dl_{i}")
+            if st.button("🗑 loeschen", key=f"out_del_{i}"):
+                pfad.unlink(missing_ok=True)
+                st.rerun()
+
+
+def verwalte_uploads():
+    """Sidebar-Bereich: hochgeladene Dateien auflisten und loeschen."""
+    with st.sidebar.expander("📁 Hochgeladene Dateien", expanded=False):
+        dateien = _dateien_im_ordner(UPLOAD_DIR)
+        if not dateien:
+            st.caption("Noch nichts hochgeladen.")
+            return
+        for i, pfad in enumerate(dateien):
+            c1, c2 = st.columns([5, 1])
+            c1.write(pfad.name)
+            if c2.button("🗑", key=f"up_del_{i}", help="loeschen"):
+                pfad.unlink(missing_ok=True)
+                st.session_state.angehaengt.discard(pfad.name)
+                st.rerun()
+
+
 def starte_session_state():
     """Legt die noetigen Werte in st.session_state an."""
     if "messages" not in st.session_state:
@@ -716,9 +861,13 @@ def starte_session_state():
         st.session_state.angehaengt = set()     # bereits gesendete Datei-Namen
     if "api_key" not in st.session_state:
         load_dotenv(ENV_PFAD)
-        st.session_state.api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+        st.session_state.api_key = hole_api_key_aus_quellen()
     if "modell" not in st.session_state:
         st.session_state.modell = MODELL
+    if "kosten_total" not in st.session_state:
+        st.session_state.kosten_total = 0.0
+    if "tokens_total" not in st.session_state:
+        st.session_state.tokens_total = 0
 
 
 def baue_seitenleiste():
@@ -744,7 +893,11 @@ def baue_seitenleiste():
             "API-Schluessel",
             value=st.session_state.api_key,
             type="password",
-            help="Bekommst du auf console.anthropic.com (API-Guthaben noetig).",
+            help=(
+                "Bekommst du auf console.anthropic.com (API-Guthaben noetig). "
+                "Online kannst du ihn auch dauerhaft in den App-Secrets hinterlegen "
+                "(ANTHROPIC_API_KEY)."
+            ),
         )
         if eingabe != st.session_state.api_key:
             st.session_state.api_key = eingabe
@@ -784,6 +937,13 @@ def baue_seitenleiste():
 
         st.divider()
         st.markdown(
+            "**Verbrauch diese Sitzung**  \n"
+            f"ca. **US$ {st.session_state.get('kosten_total', 0.0):.3f}** · "
+            f"{st.session_state.get('tokens_total', 0):,} Tokens"
+        )
+
+        st.divider()
+        st.markdown(
             "**So bedienst du die App**\n\n"
             "1. Ausgangslage hochladen oder eintippen. Die KI antwortet nur mit "
             "«Verstanden.».\n"
@@ -794,6 +954,11 @@ def baue_seitenleiste():
             "Das Wort **«Theorie»** in deiner Nachricht zieht die Dateien aus dem "
             "Ordner `theorie/` hinzu."
         )
+
+    # Eigene Sidebar-Bereiche zum Verwalten der Dateien.
+    verwalte_theorie()
+    verwalte_outputs()
+    verwalte_uploads()
 
 
 def verarbeite_uploads():
@@ -835,6 +1000,8 @@ def zeige_verlauf():
                 st.markdown(nachricht["text"])
             for j, dateiname in enumerate(nachricht.get("dateien", [])):
                 zeige_download_knopf(dateiname, key=f"dl_{i}_{j}")
+            if nachricht.get("info"):
+                st.caption(nachricht["info"])
 
 
 def fehlermeldung_fuer(fehler):
@@ -878,12 +1045,13 @@ def behandle_eingabe(frage, pending):
     with st.chat_message("assistant"):
         status = st.status("Die KI denkt nach ...", expanded=False)
         platzhalter = st.empty()
+        verbrauch = {"input": 0, "output": 0}
         try:
             client = anthropic.Anthropic(
                 api_key=st.session_state.api_key,
                 default_headers={"anthropic-version": ANTHROPIC_VERSION},
             )
-            antwort_text, neue_dateien = fuehre_konversation(
+            antwort_text, neue_dateien, verbrauch = fuehre_konversation(
                 client,
                 st.session_state.modell,
                 st.session_state.messages,
@@ -896,12 +1064,25 @@ def behandle_eingabe(frage, pending):
             neue_dateien = []
             status.update(label="Fehler.", state="error")
 
+        # Kosten dieser Antwort berechnen und zur Sitzungssumme addieren.
+        tokens = verbrauch.get("input", 0) + verbrauch.get("output", 0)
+        kosten = geschaetzte_kosten(
+            st.session_state.modell, verbrauch.get("input", 0), verbrauch.get("output", 0)
+        )
+        st.session_state.kosten_total += kosten
+        st.session_state.tokens_total += tokens
+        info_text = (
+            f"ca. US$ {kosten:.3f} · {tokens:,} Tokens" if tokens else ""
+        )
+
         platzhalter.markdown(antwort_text)
         for j, dateiname in enumerate(neue_dateien):
             zeige_download_knopf(dateiname, key=f"livedl_{len(st.session_state.anzeige)}_{j}")
+        if info_text:
+            st.caption(info_text)
 
     st.session_state.anzeige.append(
-        {"role": "assistant", "text": antwort_text, "dateien": neue_dateien}
+        {"role": "assistant", "text": antwort_text, "dateien": neue_dateien, "info": info_text}
     )
     st.rerun()
 
@@ -909,12 +1090,17 @@ def behandle_eingabe(frage, pending):
 def main():
     st.set_page_config(page_title="QV-Pruefungsassistent", page_icon="📝", layout="centered")
     ordner_anlegen()
+
+    # Optionaler Passwortschutz (nur aktiv, wenn ein Passwort gesetzt ist).
+    if not pruefe_passwort():
+        return
+
     starte_session_state()
 
     st.title("📝 QV-Pruefungsassistent")
     st.caption(
-        "Lokale Backup-App fuer die Geleitete Fallarbeit (Kaufleute EFZ, HKB B/C/E). "
-        "Alles bleibt auf diesem Computer."
+        "Assistent fuer die Geleitete Fallarbeit (Kaufleute EFZ, HKB B/C/E). "
+        "Laeuft lokal oder online. Keine Telemetrie, keine externe Datenbank."
     )
 
     baue_seitenleiste()

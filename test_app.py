@@ -388,6 +388,15 @@ def test_hilfsfunktionen():
     pruefe(app.mime_fuer("x.pdf") == "application/pdf", "MIME-Typ fuer .pdf korrekt")
     # block_zu_dict mit einem einfachen Objekt.
     pruefe(app.text_aus_bloecken([]) == "", "text_aus_bloecken mit leerer Liste")
+    # Kostenschaetzung (Sonnet: 3 USD Eingabe + 15 USD Ausgabe pro 1 Mio).
+    pruefe(
+        abs(app.geschaetzte_kosten("claude-sonnet-4-6", 1_000_000, 1_000_000) - 18.0) < 1e-6,
+        "Kostenschaetzung Sonnet korrekt (3+15 = 18 USD pro 1 Mio)",
+    )
+    pruefe(
+        abs(app.geschaetzte_kosten("claude-opus-4-8", 1_000_000, 0) - 5.0) < 1e-6,
+        "Kostenschaetzung Opus korrekt (5 USD Eingabe pro 1 Mio)",
+    )
 
 
 # --------------------------------------------------------------------------
@@ -415,10 +424,19 @@ class FakeToolUse:
         return {"type": "tool_use", "id": self.id, "name": self.name, "input": self.input}
 
 
+class FakeUsage:
+    def __init__(self, input_tokens=0, output_tokens=0):
+        self.input_tokens = input_tokens
+        self.output_tokens = output_tokens
+        self.cache_read_input_tokens = 0
+        self.cache_creation_input_tokens = 0
+
+
 class FakeResponse:
-    def __init__(self, content, stop_reason):
+    def __init__(self, content, stop_reason, usage=None):
         self.content = content
         self.stop_reason = stop_reason
+        self.usage = usage
 
 
 class FakeMessages:
@@ -446,15 +464,20 @@ def test_werkzeugschleife():
         FakeResponse(
             [FakeText("Ich erstelle die Datei."), FakeToolUse("t1", app.TOOL_NAME, {"code": code})],
             "tool_use",
+            usage=FakeUsage(1000, 200),
         ),
-        FakeResponse([FakeText("Die Datei ist bereit.")], "end_turn"),
+        FakeResponse([FakeText("Die Datei ist bereit.")], "end_turn", usage=FakeUsage(1200, 50)),
     ]
     client = FakeClient(antworten)
     messages = [{"role": "user", "content": "Mach mir ein Excel"}]
-    text, dateien = app.fuehre_konversation(client, "modell", messages)
+    text, dateien, verbrauch = app.fuehre_konversation(client, "claude-sonnet-4-6", messages)
 
     pruefe(text == "Die Datei ist bereit.", "Schlusstext der KI wird zurueckgegeben")
     pruefe("_test_mockbudget.xlsx" in dateien, "Erstellte Datei wird gemeldet (Download moeglich)")
+    pruefe(
+        verbrauch["input"] == 2200 and verbrauch["output"] == 250,
+        f"Token-Verbrauch wird ueber alle Anfragen summiert ({verbrauch})",
+    )
     pruefe(len(messages) == 4, "Verlauf enthaelt user, assistant, tool_result, assistant")
     pruefe(messages[1]["role"] == "assistant", "Assistenten-Antwort im Verlauf")
     pruefe(
@@ -485,7 +508,7 @@ def test_selbstkorrektur():
     ]
     client = FakeClient(antworten)
     messages = [{"role": "user", "content": "Mach ein Excel"}]
-    text, dateien = app.fuehre_konversation(client, "modell", messages)
+    text, dateien, verbrauch = app.fuehre_konversation(client, "claude-sonnet-4-6", messages)
 
     pruefe("_test_korrigiert.xlsx" in dateien, "Nach Korrektur wird die Datei erstellt")
     pruefe(text == "Jetzt ist die Datei bereit.", "KI meldet Erfolg nach Korrektur")
