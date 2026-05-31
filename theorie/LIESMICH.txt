@@ -1,0 +1,6 @@
+In diesen Ordner legst du deine Theorie-Dateien (PDF, Word, Excel, TXT).
+
+Die Theorie wird der KI NUR dann mitgegeben, wenn du in deiner Nachricht
+das Wort "Theorie" schreibst (zum Beispiel: "Loese T2 mit der Theorie.").
+
+Sehr lange Theorie wird automatisch gekuerzt.

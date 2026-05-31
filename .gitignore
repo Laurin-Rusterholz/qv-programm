@@ -1,0 +1,17 @@
+# Virtuelle Umgebung und Python-Cache
+.venv/
+__pycache__/
+*.pyc
+
+# Geheimer API-Schluessel - niemals hochladen
+.env
+
+# Inhalte der Arbeitsordner nicht ins Git aufnehmen,
+# die Ordner selbst aber behalten.
+uploads/*
+outputs/*
+theorie/*
+!uploads/.gitkeep
+!outputs/.gitkeep
+!theorie/.gitkeep
+!theorie/LIESMICH.txt

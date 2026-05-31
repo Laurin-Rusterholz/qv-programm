@@ -1,0 +1,13 @@
+# Pakete fuer den QV-Pruefungsassistenten.
+# Die Startskripte (start.bat / start.sh) installieren diese automatisch.
+
+streamlit>=1.40          # Chat-Oberflaeche im Browser
+anthropic>=0.40          # offizielles Claude/Anthropic-SDK
+python-dotenv>=1.0       # liest den API-Schluessel aus der .env-Datei
+
+openpyxl>=3.1            # Excel erstellen und lesen
+python-docx>=1.1         # Word erstellen und lesen
+python-pptx>=0.6.21      # PowerPoint erstellen
+reportlab>=4.0           # PDF erstellen
+pypdf>=4.0               # PDF-Text lesen
+pandas>=2.0              # Tabellen verarbeiten
