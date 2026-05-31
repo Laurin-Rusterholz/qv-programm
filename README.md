@@ -2,20 +2,25 @@
 
 Eine KI-Chat-App für die schriftliche **Geleitete Fallarbeit** (Kaufleute EFZ, HKB B/C/E).
 Sie funktioniert wie dein Claude-Projekt und erstellt zusätzlich **echte Office-Dateien**
-(Excel mit Formeln, Word, PowerPoint, PDF). Du kannst sie **lokal** auf deinem Computer
-oder **online** als Webseite betreiben.
+(Excel mit Formeln, Word, PowerPoint, PDF).
 
-> **Wichtig zu Netlify:** Netlify zeigt nur reine Webseiten an und kann **kein Python**.
-> Diese App ist eine Python-/Streamlit-App, darum lässt sie sich auf Netlify **nicht** öffnen.
-> Nimm stattdessen **Streamlit Community Cloud** (Variante B unten) – das ist gratis und
-> läuft Python nativ. Lokal funktioniert sie ohnehin (Variante A).
+Es gibt **zwei Ausführungen** – nimm die, die dir passt:
+
+| Ausführung | Wofür | Speicherung |
+|---|---|---|
+| **🌐 Browser-App** (Ordner `web/`) | Läuft komplett im Browser, ganz ohne Server. Lokal per Doppelklick **oder** auf **Netlify**. | Schlüssel und Chat nur **in deinem Browser** (localStorage). |
+| **🐍 Python-App** (Streamlit) | Läuft lokal (`start.bat`/`start.sh`) oder online auf **Streamlit Community Cloud**. | Während der Sitzung auf deinem Rechner bzw. Server. |
+
+> **Browser-App ist die einfachste Variante, wenn du „alles im Browser, nur lokal" willst** –
+> springe direkt zu [Variante C](#variante-c-browser-app).
 
 ---
 
 ## Inhalt
 - [Was die App kann](#was-die-app-kann)
-- [Variante A: Lokal starten](#variante-a-lokal-starten)
-- [Variante B: Online stellen (gratis, empfohlen für „von überall“)](#variante-b-online-stellen)
+- [Variante C: Browser-App (alles im Browser, lokal oder Netlify)](#variante-c-browser-app)
+- [Variante A: Python-App lokal starten](#variante-a-lokal-starten)
+- [Variante B: Python-App online stellen (Streamlit Cloud)](#variante-b-online-stellen)
 - [So arbeitest du damit](#so-arbeitest-du-damit)
 - [Dateien, Theorie und Kosten](#dateien-theorie-und-kosten)
 - [Wenn etwas nicht klappt](#wenn-etwas-nicht-klappt)
@@ -33,6 +38,37 @@ oder **online** als Webseite betreiben.
 - **API-Schlüssel** im Feld eingeben (oder online dauerhaft in den Secrets hinterlegen).
 - **Kosten-/Token-Anzeige** pro Antwort und pro Sitzung.
 - **Passwortschutz** für den Online-Betrieb.
+
+---
+
+## Variante C: Browser-App
+(Alles im Browser, ohne Server. Schlüssel und Chat bleiben **nur in deinem Browser** gespeichert.)
+
+### Lokal öffnen (Doppelklick)
+- **Windows:** Doppelklick auf **`start-web.bat`**.
+- **Mac/Linux:** **`start-web.sh`** ausführen (im Terminal: `bash start-web.sh`).
+
+Es öffnet sich der Browser unter **http://localhost:8000**. (Es wird nur ein winziger lokaler
+Webserver gestartet, damit der Browser die App laden darf – es geht nichts ins Internet ausser
+den Anfragen an die KI.) Dann links den **API-Schlüssel** eintragen, **«Verbindung testen»**,
+loslegen. Der Schlüssel bleibt gespeichert; beim nächsten Mal ist er schon da.
+
+### Auf Netlify legen (von überall erreichbar)
+1. Auf **https://app.netlify.com** anmelden (gratis).
+2. Entweder **das GitHub-Repo verbinden** – Netlify nutzt automatisch die Datei `netlify.toml`
+   und veröffentlicht den Ordner `web/` – **oder** den Ordner `web/` einfach per Drag-and-drop
+   auf die Netlify-Seite ziehen.
+3. Seite öffnen, **API-Schlüssel eintragen** (er bleibt nur in deinem Browser), loslegen.
+
+> **Sicherheit:** Der Schlüssel wird in deinem Browser gespeichert und ist dort technisch
+> sichtbar (das ist bei reinen Browser-Apps so und für die private Nutzung mit deinem eigenen
+> Schlüssel in Ordnung). Trage den Schlüssel **niemals fest in den Code** ein. Auf einer
+> öffentlichen Netlify-Adresse gibt **jede Person ihren eigenen** Schlüssel ein – deiner wird
+> dabei nicht weitergegeben.
+
+> **Hinweis:** Dateien anhängen mit dem **📎-Symbol** im Eingabefeld (auch mehrere). Erstellte
+> Dateien gleich herunterladen – nach einem Neuladen müssen sie ggf. neu erstellt werden (der
+> Chat-Text selbst bleibt erhalten).
 
 ---
 

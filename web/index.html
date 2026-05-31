@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>QV-Pruefungsassistent</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+    <aside id="sidebar">
+      <h1>📝 QV-Assistent</h1>
+      <p class="untertitel">Geleitete Fallarbeit (KV EFZ). Alles bleibt in deinem Browser.</p>
+
+      <label class="feld">Modell
+        <select id="modell"></select>
+      </label>
+
+      <label class="feld">API-Schluessel
+        <input id="apikey" type="password" placeholder="sk-ant-..." autocomplete="off" />
+      </label>
+      <div class="knopfreihe">
+        <button id="test-btn" class="sekundaer">Verbindung testen</button>
+      </div>
+      <div id="test-status" class="hinweis"></div>
+
+      <button id="neu-btn" class="sekundaer breit">Neuer Chat</button>
+
+      <div id="kosten" class="kosten"></div>
+
+      <details class="block">
+        <summary>📚 Theorie-Dateien</summary>
+        <p class="klein">Wird nur genutzt, wenn deine Nachricht das Wort «Theorie» enthaelt.</p>
+        <input id="theorie-input" type="file" multiple />
+        <ul id="theorie-liste" class="liste"></ul>
+      </details>
+
+      <details class="block">
+        <summary>ℹ️ Bedienung</summary>
+        <ol class="klein">
+          <li>Ausgangslage eintippen oder per 📎 anhaengen. Die KI antwortet nur mit «Verstanden.».</li>
+          <li>Teilaufgabe starten, z. B. «T1», mit Fach (HKB B/C/E) und Aufgabe.</li>
+          <li>Ein Dokument entsteht nur, wenn du es ausdruecklich verlangst (z. B. «als Excel»).</li>
+          <li>Rueckfragen stellen oder mit «weiter» fortfahren.</li>
+        </ol>
+        <p class="klein">📎 unten erlaubt eine oder mehrere Dateien pro Nachricht.</p>
+      </details>
+
+      <p class="klein fuss">Schluessel von console.anthropic.com (Guthaben noetig). Kosten je Nutzung.</p>
+    </aside>
+
+    <main id="main">
+      <div id="verlauf"></div>
+
+      <div id="eingabe-bereich">
+        <div id="anhaenge"></div>
+        <div id="eingabe-zeile">
+          <button id="anhang-btn" title="Dateien anhaengen" class="icon">📎</button>
+          <input id="datei-input" type="file" multiple hidden />
+          <textarea id="eingabe" rows="1" placeholder="Ausgangslage, Teilaufgabe (z. B. «T1») oder Rueckfrage ..."></textarea>
+          <button id="senden-btn" class="primaer">Senden</button>
+        </div>
+        <div id="status-zeile" class="hinweis"></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Bibliotheken (lokal eingebunden, kein CDN noetig) -->
+  <script src="vendor/xlsx.full.min.js"></script>
+  <script src="vendor/docx.umd.js"></script>
+  <script src="vendor/pptxgen.bundle.js"></script>
+  <script src="vendor/jspdf.umd.min.js"></script>
+  <script src="vendor/mammoth.browser.min.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

@@ -3,6 +3,10 @@
 __pycache__/
 *.pyc
 
+# Node / Browser-App (nur fuer Tests; die App selbst braucht kein node_modules)
+web/node_modules/
+web/test-results/
+
 # Geheime Werte - niemals hochladen
 .env
 .streamlit/secrets.toml

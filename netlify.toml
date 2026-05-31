@@ -1,0 +1,5 @@
+# Netlify-Konfiguration: die Browser-App liegt im Ordner web/.
+# Es gibt keinen Build-Schritt (reine statische Webseite).
+[build]
+  publish = "web"
+  command = ""

@@ -1,0 +1,94 @@
+:root {
+  --blau: #1f6feb;
+  --blau-dunkel: #1a5fd0;
+  --bg: #f4f5f7;
+  --karte: #ffffff;
+  --rand: #d8dce2;
+  --text: #1f2328;
+  --grau: #6b7280;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+#app { display: flex; height: 100vh; }
+
+/* Sidebar */
+#sidebar {
+  width: 300px;
+  flex-shrink: 0;
+  background: var(--karte);
+  border-right: 1px solid var(--rand);
+  padding: 18px 16px;
+  overflow-y: auto;
+}
+#sidebar h1 { font-size: 20px; margin: 0 0 2px; }
+.untertitel { font-size: 12px; color: var(--grau); margin: 0 0 16px; }
+.feld { display: block; font-size: 12px; font-weight: 600; color: #374151; margin: 12px 0 0; }
+.feld select, .feld input {
+  width: 100%; margin-top: 4px; padding: 8px; font-size: 14px;
+  border: 1px solid var(--rand); border-radius: 8px; background: #fff;
+}
+.knopfreihe { margin-top: 8px; }
+button {
+  cursor: pointer; border: none; border-radius: 8px; font-size: 14px; font-weight: 600;
+}
+button.primaer { background: var(--blau); color: #fff; padding: 10px 16px; }
+button.primaer:hover { background: var(--blau-dunkel); }
+button.sekundaer { background: #eef1f5; color: #374151; padding: 8px 12px; }
+button.sekundaer:hover { background: #e2e6ec; }
+button.breit { width: 100%; margin-top: 10px; }
+button:disabled { opacity: 0.5; cursor: default; }
+.icon { background: #eef1f5; padding: 8px 10px; font-size: 18px; line-height: 1; }
+
+.hinweis { font-size: 12px; margin-top: 6px; min-height: 1em; }
+.hinweis.ok { color: #15803d; }
+.hinweis.fehler { color: #b91c1c; }
+.kosten { font-size: 12px; color: #374151; margin: 14px 0; padding: 10px; background: #f1f5f9; border-radius: 8px; }
+.block { margin-top: 14px; border: 1px solid var(--rand); border-radius: 8px; padding: 8px 10px; }
+.block summary { cursor: pointer; font-weight: 600; font-size: 13px; }
+.klein { font-size: 12px; color: var(--grau); }
+.fuss { margin-top: 18px; }
+.liste { list-style: none; padding: 0; margin: 8px 0 0; }
+.liste li { display: flex; justify-content: space-between; align-items: center; font-size: 12px; padding: 3px 0; }
+.liste li button { background: none; color: #b91c1c; font-size: 14px; padding: 0 4px; }
+
+/* Main / Chat */
+#main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+#verlauf { flex: 1; overflow-y: auto; padding: 24px; }
+.nachricht { max-width: 760px; margin: 0 auto 16px; display: flex; gap: 10px; }
+.nachricht .bubble {
+  background: var(--karte); border: 1px solid var(--rand); border-radius: 12px;
+  padding: 12px 14px; font-size: 15px; line-height: 1.5; white-space: pre-wrap; word-wrap: break-word; flex: 1;
+}
+.nachricht.user .bubble { background: #eaf2ff; border-color: #cfe0ff; }
+.nachricht .rolle { font-size: 18px; width: 28px; text-align: center; flex-shrink: 0; }
+.info { font-size: 11px; color: var(--grau); margin-top: 6px; }
+.dl-knopf {
+  display: inline-block; margin: 8px 8px 0 0; padding: 8px 12px; background: var(--blau);
+  color: #fff; border-radius: 8px; font-size: 13px; font-weight: 600; border: none; cursor: pointer;
+}
+.dl-knopf:hover { background: var(--blau-dunkel); }
+.dl-knopf.weg { background: #9ca3af; cursor: default; }
+
+/* Eingabe */
+#eingabe-bereich { border-top: 1px solid var(--rand); background: var(--karte); padding: 12px 24px 16px; }
+#anhaenge { max-width: 780px; margin: 0 auto; display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; background: #eef1f5; border-radius: 16px; padding: 4px 10px; font-size: 12px; }
+.chip button { background: none; color: #6b7280; padding: 0; font-size: 14px; }
+#eingabe-zeile { max-width: 780px; margin: 6px auto 0; display: flex; gap: 8px; align-items: flex-end; }
+#eingabe {
+  flex: 1; resize: none; padding: 10px 12px; font-size: 15px; font-family: inherit;
+  border: 1px solid var(--rand); border-radius: 10px; max-height: 200px;
+}
+#status-zeile { max-width: 780px; margin: 4px auto 0; }
+.warnung { max-width: 760px; margin: 0 auto 16px; background: #fef9c3; border: 1px solid #fde047; border-radius: 10px; padding: 12px 14px; font-size: 14px; }
+
+@media (max-width: 720px) {
+  #sidebar { width: 220px; }
+  #verlauf { padding: 14px; }
+  #eingabe-bereich { padding: 10px 12px; }
+}
