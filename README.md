@@ -25,7 +25,7 @@ oder **online** als Webseite betreiben.
 
 ## Was die App kann
 - Chat mit vollem Verlauf, genau nach deinem Ablauf (Ausgangslage → «Verstanden.» → Teilaufgaben).
-- **Datei-Upload**: PDF und Bilder gehen direkt an die KI; Word/Excel/TXT werden als Text gelesen.
+- **Datei-Upload** direkt im Eingabefeld (📎), auch **mehrere auf einmal**: PDF und Bilder gehen direkt an die KI; Word/Excel/TXT werden als Text gelesen.
 - **Datei-Erstellung**: Excel mit echten Formeln, Word (breite Tabellen im Querformat),
   PowerPoint (Folienmaster), PDF – mit automatischer Selbstkorrektur und Download-Knopf.
 - **Theorie-Ordner**: wird nur einbezogen, wenn deine Nachricht das Wort **«Theorie»** enthält.
@@ -106,9 +106,10 @@ Die KI bezieht **immer den ganzen bisherigen Chat** mit ein.
 
 ## Dateien, Theorie und Kosten
 
-### Datei-Upload (an die nächste Nachricht anhängen)
-Oben im Bereich **«Dateien hochladen»** auswählen. Die Dateien werden mit deiner nächsten
-Nachricht an die KI gesendet (PDF/Bild direkt, Word/Excel/TXT als Text).
+### Dateien anhängen (eine oder mehrere)
+Direkt im Chat-Eingabefeld unten auf das **Büroklammer-Symbol 📎** klicken und **eine oder
+mehrere Dateien** auswählen. Sie werden zusammen mit deinem Text gesendet (PDF/Bild gehen
+direkt an die KI, Word/Excel/TXT werden als Text gelesen).
 
 ### Verwalten (Seitenleiste)
 - **📚 Theorie-Dateien:** hier deine Theorie hochladen. Sie wird **nur** genutzt, wenn deine

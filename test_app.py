@@ -527,6 +527,75 @@ def test_selbstkorrektur():
     )
 
 
+class FakeUpload:
+    """Ahmt eine von Streamlit hochgeladene Datei nach (.name, .getvalue())."""
+
+    def __init__(self, name, daten):
+        self.name = name
+        self._daten = daten
+
+    def getvalue(self):
+        return self._daten
+
+
+class FakeChatEingabe:
+    def __init__(self, text, files):
+        self.text = text
+        self.files = files
+
+
+def test_mehrere_dateien():
+    abschnitt("Test 13: Mehrere Dateien in EINER Nachricht (Upload im Chat-Feld)")
+    # Chat-Eingabe entpacken: reiner Text und Text+Dateien.
+    pruefe(app.entpacke_chat_eingabe("Hallo") == ("Hallo", []), "Reiner Text wird erkannt")
+    text, dateien = app.entpacke_chat_eingabe(
+        FakeChatEingabe("Frage", [FakeUpload("a.txt", b"x"), FakeUpload("b.txt", b"y")])
+    )
+    pruefe(text == "Frage" and len(dateien) == 2, "Text + mehrere Dateien werden entpackt")
+
+    # Mehrere Uploads werden gespeichert.
+    pfade = app.speichere_uploads(
+        [FakeUpload("_test_a.txt", b"AAA"), FakeUpload("_test_b.txt", b"BBB")]
+    )
+    pruefe(len(pfade) == 2 and all(p.exists() for p in pfade), "Mehrere Uploads gespeichert")
+
+    # baue_user_inhalt mit ZWEI Dateien (PDF + Excel) -> beide enthalten.
+    app.python_ausfuehren(
+        'from reportlab.pdfgen import canvas\nc=canvas.Canvas("uploads/_test_m.pdf")\n'
+        'c.drawString(72,800,"PDFINHALT")\nc.save()\n'
+    )
+    app.python_ausfuehren(
+        'import openpyxl\nwb=openpyxl.Workbook()\nwb.active["A1"]="XLSXINHALT"\n'
+        'wb.save("uploads/_test_m.xlsx")\n'
+    )
+    inhalt = app.baue_user_inhalt(
+        "Vergleiche beide Dateien",
+        [app.UPLOAD_DIR / "_test_m.pdf", app.UPLOAD_DIR / "_test_m.xlsx"],
+        "",
+    )
+    typen = [b.get("type") for b in inhalt]
+    pruefe("document" in typen, "PDF ist als nativer document-Block enthalten")
+    pruefe(
+        any(b.get("type") == "text" and "XLSXINHALT" in b.get("text", "") for b in inhalt),
+        "Excel-Inhalt ist als Text enthalten",
+    )
+    pruefe(
+        any(b.get("type") == "text" and "Vergleiche beide" in b.get("text", "") for b in inhalt),
+        "Beide Dateien UND der Nutzertext sind in einer Nachricht (mehrere auf einmal)",
+    )
+
+    # Nur Dateien, kein Text: Datei-Block vorhanden, kein leerer Textblock.
+    nur_datei = app.baue_user_inhalt("", [app.UPLOAD_DIR / "_test_m.pdf"], "")
+    pruefe(
+        any(b.get("type") == "document" for b in nur_datei),
+        "Nachricht ohne Text, nur Datei, enthaelt die Datei",
+    )
+    pruefe(
+        all(b.get("text", "") != "" for b in nur_datei if b.get("type") == "text"),
+        "Kein leerer Textblock bei leerem Nachrichtentext",
+    )
+
+
 def aufraeumen():
     """Loescht alle Testdateien (_test_*) aus den Arbeitsordnern."""
     for ordner in (app.OUTPUT_DIR, app.UPLOAD_DIR, app.THEORIE_DIR):
@@ -554,6 +623,7 @@ def main():
         test_hilfsfunktionen()
         test_werkzeugschleife()
         test_selbstkorrektur()
+        test_mehrere_dateien()
     finally:
         aufraeumen()
 

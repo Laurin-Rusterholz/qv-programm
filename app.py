@@ -400,7 +400,10 @@ def baue_user_inhalt(text, datei_pfade, theorie_text):
                     "text": f"[Datei {Path(pfad).name} konnte nicht verarbeitet werden: {fehler}]",
                 }
             )
-    inhalt.append({"type": "text", "text": text})
+    if text and text.strip():
+        inhalt.append({"type": "text", "text": text})
+    if not inhalt:
+        inhalt.append({"type": "text", "text": "(leere Nachricht)"})
     return inhalt
 
 
@@ -945,12 +948,14 @@ def baue_seitenleiste():
         st.divider()
         st.markdown(
             "**So bedienst du die App**\n\n"
-            "1. Ausgangslage hochladen oder eintippen. Die KI antwortet nur mit "
-            "«Verstanden.».\n"
+            "1. Ausgangslage eintippen oder als Datei anhaengen. Die KI antwortet nur "
+            "mit «Verstanden.».\n"
             "2. Teilaufgabe starten, z. B. «T1», mit Fach (HKB B/C/E) und Aufgabe.\n"
             "3. Ein Dokument entsteht nur, wenn du es ausdruecklich verlangst "
             "(z. B. «als Excel»).\n"
             "4. Rueckfragen stellen oder mit «weiter» fortfahren.\n\n"
+            "**Dateien anhaengen:** mit dem Bueroklammer-Symbol 📎 unten im Eingabefeld "
+            "(auch **mehrere auf einmal**).\n\n"
             "Das Wort **«Theorie»** in deiner Nachricht zieht die Dateien aus dem "
             "Ordner `theorie/` hinzu."
         )
@@ -961,35 +966,30 @@ def baue_seitenleiste():
     verwalte_uploads()
 
 
-def verarbeite_uploads():
-    """Zeigt den Datei-Upload und gibt die noch nicht gesendeten Pfade zurueck."""
-    pending = []
-    with st.expander("Dateien hochladen (PDF, Bild, Word, Excel, TXT)", expanded=False):
-        hochgeladen = st.file_uploader(
-            "Dateien auswaehlen",
-            accept_multiple_files=True,
-            label_visibility="collapsed",
-        )
-        if hochgeladen:
-            for datei in hochgeladen:
-                zielpfad = UPLOAD_DIR / sicherer_dateiname(datei.name)
-                daten = datei.getvalue()
-                try:
-                    if (not zielpfad.exists()) or zielpfad.stat().st_size != len(daten):
-                        zielpfad.write_bytes(daten)
-                except OSError as fehler:
-                    st.warning(f"Konnte {datei.name} nicht speichern: {fehler}")
-                    continue
-                if zielpfad.name not in st.session_state.angehaengt:
-                    pending.append(zielpfad)
-        if pending:
-            st.info(
-                "Wird mit der naechsten Nachricht an die KI gesendet: "
-                + ", ".join(p.name for p in pending)
-            )
-        elif hochgeladen:
-            st.caption("Diese Dateien wurden bereits gesendet.")
-    return pending
+def entpacke_chat_eingabe(eingabe):
+    """Zerlegt die Chat-Eingabe in (Text, Liste hochgeladener Dateien).
+
+    st.chat_input liefert mit accept_file ein Objekt mit .text und .files,
+    ohne accept_file einen reinen String. Beides wird hier abgefangen.
+    """
+    if isinstance(eingabe, str):
+        return eingabe, []
+    text = getattr(eingabe, "text", "") or ""
+    dateien = list(getattr(eingabe, "files", None) or [])
+    return text, dateien
+
+
+def speichere_uploads(dateien):
+    """Speichert hochgeladene Dateien in uploads/ und gibt ihre Pfade zurueck."""
+    pfade = []
+    for datei in dateien:
+        ziel = UPLOAD_DIR / sicherer_dateiname(datei.name)
+        try:
+            ziel.write_bytes(datei.getvalue())
+        except OSError:
+            continue
+        pfade.append(ziel)
+    return pfade
 
 
 def zeige_verlauf():
@@ -1020,20 +1020,20 @@ def fehlermeldung_fuer(fehler):
     return f"Unerwarteter Fehler: {fehler}"
 
 
-def behandle_eingabe(frage, pending):
+def behandle_eingabe(frage, datei_pfade):
     """Verarbeitet eine neue Nutzer-Nachricht: anhaengen, senden, anzeigen."""
     # Theorie nur laden, wenn das Wort vorkommt.
     theorie_text = lade_theorie() if "theorie" in frage.lower() else ""
 
-    user_inhalt = baue_user_inhalt(frage, pending, theorie_text)
+    user_inhalt = baue_user_inhalt(frage, datei_pfade, theorie_text)
     st.session_state.messages.append({"role": "user", "content": user_inhalt})
-    for pfad in pending:
-        st.session_state.angehaengt.add(pfad.name)
 
     # Anzeige-Text der Nutzer-Nachricht.
-    anzeige_text = frage
-    if pending:
-        anzeige_text += "\n\n*angehaengt: " + ", ".join(p.name for p in pending) + "*"
+    anzeige_text = frage if frage.strip() else "_(nur Datei(en) gesendet)_"
+    if datei_pfade:
+        anzeige_text += (
+            "\n\n*📎 angehaengt: " + ", ".join(p.name for p in datei_pfade) + "*"
+        )
     if theorie_text:
         anzeige_text += "\n\n*Theorie-Kontext wurde mitgegeben*"
     st.session_state.anzeige.append({"role": "user", "text": anzeige_text, "dateien": []})
@@ -1121,18 +1121,24 @@ def main():
             "(dafuer ist API-Guthaben noetig). Danach «Verbindung testen» druecken."
         )
 
-    pending = verarbeite_uploads()
     zeige_verlauf()
 
-    frage = st.chat_input("Ausgangslage, Teilaufgabe (z. B. «T1») oder Rueckfrage ...")
-    if frage:
+    # Datei-Upload ist direkt ins Eingabefeld integriert (Bueroklammer-Symbol).
+    # accept_file="multiple" erlaubt eine oder mehrere Dateien pro Nachricht.
+    eingabe = st.chat_input(
+        "Ausgangslage, Teilaufgabe (z. B. «T1») oder Rueckfrage ...",
+        accept_file="multiple",
+    )
+    if eingabe:
+        frage, dateien = entpacke_chat_eingabe(eingabe)
         if not st.session_state.api_key:
             st.error(
                 "Bitte zuerst links den API-Schluessel eintragen. Einen Schluessel "
                 "bekommst du auf console.anthropic.com (API-Guthaben noetig)."
             )
-        else:
-            behandle_eingabe(frage, pending)
+        elif frage.strip() or dateien:
+            pfade = speichere_uploads(dateien)
+            behandle_eingabe(frage, pfade)
 
 
 if __name__ == "__main__":
