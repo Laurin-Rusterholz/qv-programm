@@ -106,18 +106,19 @@ Mit **«In .env speichern»** musst du ihn beim nächsten Mal nicht erneut einti
    - **Branch:** `main`
    - **Main file path:** `app.py`
    - (Unter «Advanced settings» kannst du **Python 3.11** wählen.)
-4. **Secrets eintragen** (sehr empfohlen!): unter «Advanced settings» → **Secrets** das hier einfügen
-   und ausfüllen (Vorlage: `.streamlit/secrets.toml.example`):
+4. **Secrets eintragen** (empfohlen): unter «Advanced settings» → **Secrets** nur das Passwort
+   setzen (Vorlage: `.streamlit/secrets.toml.example`):
    ```toml
    APP_PASSWORT = "ein-eigenes-passwort"
-   ANTHROPIC_API_KEY = "sk-ant-dein-schluessel"
    ```
    - `APP_PASSWORT` schützt die Seite, damit **nur du** sie nutzen kannst (sonst ist die URL offen!).
-   - `ANTHROPIC_API_KEY` ist optional – wenn gesetzt, musst du ihn in der App nicht mehr eintippen.
+   - **Den API-Schlüssel NICHT in die Secrets eintragen.** Sonst wäre er auf jedem Gerät
+     aktiv/sichtbar. Du gibst ihn stattdessen **in der App pro Gerät einzeln** ein (Feld
+     «API-Schlüssel»); er wird nur in dieser Sitzung gehalten und nicht geteilt.
 5. **«Deploy»** klicken. Nach ein paar Minuten läuft die App unter einer
    `…streamlit.app`-Adresse, die du speichern (z. B. als Lesezeichen) kannst.
-6. Seite öffnen → **Passwort** eingeben → falls kein Schlüssel in den Secrets steht, links den
-   **API-Schlüssel** eintragen → **«Verbindung testen»** → loslegen.
+6. Seite öffnen → **Passwort** eingeben → links den **API-Schlüssel** eintragen (auf jedem Gerät
+   einmal) → **«Verbindung testen»** → loslegen.
 
 > **Tipp:** Mach diesen Schritt **schon heute Abend** und drücke einmal «Verbindung testen»,
 > damit morgen sicher alles läuft.
@@ -174,7 +175,9 @@ die Summe der Sitzung. Die API rechnet in US-Dollar ab; **es entstehen echte Kos
 ## Datenschutz und Sicherheit
 - Keine eigene Datenbank, keine Telemetrie (Streamlit-Statistik ist abgeschaltet).
 - Deine Texte und Dateien gehen nur an die **Anthropic-KI**, damit sie antworten kann.
-- Der API-Schlüssel steht in deiner lokalen `.env` bzw. (online) in den **Secrets** – beide
-  werden **nicht** ins Git aufgenommen.
+- Der API-Schlüssel wird **pro Gerät einzeln** eingegeben und **nicht in den Secrets** abgelegt,
+  damit er nicht geteilt oder auf anderen Geräten angezeigt wird. Lokal kann er in deiner eigenen
+  `.env` liegen (mit «In .env speichern»); diese wird **nicht** ins Git aufgenommen. In der
+  Browser-App liegt er nur im localStorage des jeweiligen Geräts.
 - **Online unbedingt ein `APP_PASSWORT` setzen**, sonst könnte jede Person mit der URL die App
-  (und damit dein API-Guthaben) nutzen.
+  nutzen.

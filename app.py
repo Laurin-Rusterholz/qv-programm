@@ -859,11 +859,19 @@ def _secret_oder_none(name):
 
 
 def hole_api_key_aus_quellen():
-    """API-Schluessel aus st.secrets (Cloud) oder Umgebung/.env (lokal)."""
-    aus_secret = _secret_oder_none("ANTHROPIC_API_KEY")
-    if aus_secret:
-        return str(aus_secret)
-    return os.environ.get("ANTHROPIC_API_KEY", "")
+    """API-Schluessel NUR aus der lokalen .env-Datei (geraetegebunden).
+
+    Bewusst NICHT aus st.secrets oder Umgebungsvariablen: So wird der Schluessel bei
+    einer Online-Bereitstellung nicht geteilt oder auf anderen Geraeten angezeigt,
+    sondern muss auf jedem Geraet einzeln eingegeben werden.
+    """
+    try:
+        from dotenv import dotenv_values
+
+        werte = dotenv_values(ENV_PFAD)
+        return (werte.get("ANTHROPIC_API_KEY") or "").strip()
+    except Exception:
+        return ""
 
 
 def pruefe_passwort():
@@ -1009,8 +1017,7 @@ def baue_seitenleiste():
             type="password",
             help=(
                 "Bekommst du auf console.anthropic.com (API-Guthaben noetig). "
-                "Online kannst du ihn auch dauerhaft in den App-Secrets hinterlegen "
-                "(ANTHROPIC_API_KEY)."
+                "Wird pro Geraet einzeln eingegeben und online nicht geteilt."
             ),
         )
         if eingabe != st.session_state.api_key:
