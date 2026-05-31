@@ -117,7 +117,16 @@ TOOLS = [
             "geschrieben werden; nutze relative Pfade wie 'outputs/Budget.xlsx'. "
             "Bei Excel immer echte Formeln verwenden (Zellen, die mit '=' beginnen) "
             "und alle Eingabewerte in eigene, klar beschriftete Zellen legen, auf die "
-            "die Formeln verweisen. Schreibe nichts ausserhalb des Projektordners."
+            "die Formeln verweisen. WICHTIG (Excel/openpyxl): Schreibe Formeln IMMER mit "
+            "englischen Funktionsnamen (SUM, SUMPRODUCT, COUNTIF, COUNTIFS, SUMIF, ROUND, "
+            "IF, AVERAGE, MAX, MIN, VLOOKUP) und Komma als Argumenttrennzeichen, niemals "
+            "deutsche Namen (SUMME, SUMMENPRODUKT, ZAEHLENWENN) oder Semikolon, sonst zeigt "
+            "Excel #NAME?. Berechne die Resultate deiner Formeln zusaetzlich in Python und "
+            "nenne im Begleittext genau diese Zahlen (Text und Excel muessen uebereinstimmen; "
+            "die Summe der Haeufigkeiten muss der Gesamtzahl entsprechen). Diagramme "
+            "vollstaendig beschriften (Titel, Achsentitel, Datenbeschriftungen, Legende) und "
+            "den hervorzuhebenden Datenpunkt mit einer eigenen, deutlich abweichenden Farbe "
+            "einfaerben. Schreibe nichts ausserhalb des Projektordners."
         ),
         "input_schema": {
             "type": "object",
@@ -215,6 +224,16 @@ Du bist mein QV-Prüfungsassistent für die schriftliche Geleitete Fallarbeit (K
 - Hochgeladene Dateien liegen im Ordner `uploads/`. Aus diesem Ordner kannst du auch eine vorgegebene Vorlage lesen und ausfüllen.
 - Theorie-Dateien liegen im Ordner `theorie/` und werden dir nur dann mitgegeben, wenn meine Nachricht das Wort «Theorie» enthält.
 - Wenn du eine Datei erstellt hast, sag mir nur kurz, dass sie bereit ist. Die Oberfläche zeigt automatisch einen Download-Knopf.
+"""
+
+
+# Zusaetzliche Regeln gegen typische QV-Fehler (werden an den System-Prompt angehaengt).
+ZUSATZ_REGELN = """
+
+## Technische Korrektheit (zusaetzlich, wichtig fuers QV)
+- Excel-Formeln in openpyxl IMMER mit englischen Funktionsnamen (SUM, SUMPRODUCT, COUNTIF, COUNTIFS, SUMIF, ROUND, IF, AVERAGE, VLOOKUP) und Komma als Trennzeichen schreiben. Niemals deutsche Namen (SUMME, SUMMENPRODUKT, ZAEHLENWENN) oder Semikolon verwenden, sonst zeigt Excel #NAME?. Excel uebersetzt die Anzeige selbst ins Deutsche.
+- Zahlen im Chat muessen exakt den Excel-Formel-Resultaten entsprechen. Berechne dieselben Werte zur Sicherheit zusaetzlich in Python (z. B. die COUNTIF-Haeufigkeiten) und nenne im Text nur diese; die Summe der Haeufigkeiten muss der Gesamtzahl der Eintraege entsprechen.
+- Diagramme vollstaendig beschriften: Titel, Achsentitel, Datenbeschriftungen und Legende. Den wichtigsten Wert (z. B. hoechste Nutzung) mit einer eigenen, klar abweichenden Farbe hervorheben, sodass er sofort erkennbar ist.
 """
 
 
@@ -480,6 +499,67 @@ def python_ausfuehren(code, timeout=120):
     }
 
 
+# Deutsche Excel-Funktionsnamen, die in openpyxl zu #NAME? fuehren (-> englische Form).
+DEUTSCHE_EXCEL_FUNKTIONEN = {
+    "SUMMENPRODUKT": "SUMPRODUCT",
+    "SUMMEWENNS": "SUMIFS",
+    "SUMMEWENN": "SUMIF",
+    "SUMME": "SUM",
+    "ZÄHLENWENNS": "COUNTIFS",
+    "ZÄHLENWENN": "COUNTIF",
+    "ZAEHLENWENNS": "COUNTIFS",
+    "ZAEHLENWENN": "COUNTIF",
+    "ANZAHL2": "COUNTA",
+    "ANZAHL": "COUNT",
+    "MITTELWERT": "AVERAGE",
+    "RUNDEN": "ROUND",
+    "WENNFEHLER": "IFERROR",
+    "WENN": "IF",
+    "SVERWEIS": "VLOOKUP",
+    "WVERWEIS": "HLOOKUP",
+    "HEUTE": "TODAY",
+    "JETZT": "NOW",
+}
+
+
+def pruefe_excel_auf_namensfehler(pfad):
+    """Sucht in einer .xlsx nach deutschen Funktionsnamen/Semikolon (Ursache fuer #NAME?).
+
+    Rueckgabe: Liste verstaendlicher Hinweise (leer = alles in Ordnung).
+    """
+    import re
+    import openpyxl
+
+    probleme = []
+    try:
+        workbook = openpyxl.load_workbook(str(pfad), data_only=False)
+    except Exception:
+        return probleme
+
+    for blatt in workbook.worksheets:
+        for zeile in blatt.iter_rows():
+            for zelle in zeile:
+                wert = zelle.value
+                if not isinstance(wert, str) or not wert.startswith("="):
+                    continue
+                gross = wert.upper()
+                for deutsch, englisch in DEUTSCHE_EXCEL_FUNKTIONEN.items():
+                    muster = r"(?<![A-ZÄÖÜ0-9_.])" + re.escape(deutsch) + r"\s*\("
+                    if re.search(muster, gross):
+                        probleme.append(
+                            f"{blatt.title}!{zelle.coordinate}: deutsche Funktion "
+                            f"'{deutsch}' -> bitte '{englisch}' verwenden"
+                        )
+                        break
+                if ";" in wert:
+                    probleme.append(
+                        f"{blatt.title}!{zelle.coordinate}: Semikolon in Formel -> "
+                        "Komma als Trennzeichen verwenden"
+                    )
+    workbook.close()
+    return list(dict.fromkeys(probleme))[:20]
+
+
 def block_zu_dict(block):
     """Wandelt einen Antwort-Block des SDK in ein einfaches dict (zum Zurueckschicken)."""
     if hasattr(block, "model_dump"):
@@ -535,7 +615,7 @@ def fuehre_konversation(client, modell, messages, status_callback=None):
     system_param = [
         {
             "type": "text",
-            "text": SYSTEM_PROMPT,
+            "text": SYSTEM_PROMPT + ZUSATZ_REGELN,
             "cache_control": {"type": "ephemeral"},
         }
     ]
@@ -608,24 +688,55 @@ def fuehre_konversation(client, modell, messages, status_callback=None):
                     }
                 )
             else:
+                # Sicherheits-Check: erstellte Excel-Dateien auf deutsche Funktionsnamen
+                # bzw. Semikolon pruefen (sonst zeigt Excel #NAME?).
+                excel_probleme = []
                 for name in ergebnis["neue_dateien"]:
-                    if name not in neue_dateien:
-                        neue_dateien.append(name)
-                ausgabe = ergebnis["ausgabe"].strip() or "(keine Textausgabe)"
-                dateien = ", ".join(ergebnis["neue_dateien"]) or "(keine neuen Dateien)"
-                inhalt = (
-                    "Ausfuehrung erfolgreich.\n"
-                    f"Standardausgabe:\n{ausgabe}\n"
-                    f"Neu erstellte Dateien in outputs/: {dateien}"
-                )
-                tool_ergebnisse.append(
-                    {
-                        "type": "tool_result",
-                        "tool_use_id": block.id,
-                        "content": inhalt,
-                        "is_error": False,
-                    }
-                )
+                    if name.lower().endswith((".xlsx", ".xlsm")):
+                        excel_probleme.extend(
+                            pruefe_excel_auf_namensfehler(OUTPUT_DIR / name)
+                        )
+
+                if excel_probleme:
+                    fehler_anzahl += 1
+                    inhalt = (
+                        "Die Datei wurde gespeichert, aber die Excel-Formeln wuerden in "
+                        "Excel den Fehler #NAME? ergeben:\n- "
+                        + "\n- ".join(excel_probleme)
+                        + "\n\nSchreibe die betroffenen Formeln mit ENGLISCHEN "
+                        "Funktionsnamen (SUM, SUMPRODUCT, COUNTIF, COUNTIFS, SUMIF, ROUND, "
+                        "IF, AVERAGE, VLOOKUP) und Komma als Trennzeichen und rufe das "
+                        "Werkzeug erneut auf."
+                    )
+                    if fehler_anzahl >= MAX_FEHLER_VERSUCHE:
+                        inhalt += "\n\nDies war der letzte Korrekturversuch."
+                    tool_ergebnisse.append(
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": block.id,
+                            "content": inhalt,
+                            "is_error": True,
+                        }
+                    )
+                else:
+                    for name in ergebnis["neue_dateien"]:
+                        if name not in neue_dateien:
+                            neue_dateien.append(name)
+                    ausgabe = ergebnis["ausgabe"].strip() or "(keine Textausgabe)"
+                    dateien = ", ".join(ergebnis["neue_dateien"]) or "(keine neuen Dateien)"
+                    inhalt = (
+                        "Ausfuehrung erfolgreich.\n"
+                        f"Standardausgabe:\n{ausgabe}\n"
+                        f"Neu erstellte Dateien in outputs/: {dateien}"
+                    )
+                    tool_ergebnisse.append(
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": block.id,
+                            "content": inhalt,
+                            "is_error": False,
+                        }
+                    )
 
         messages.append({"role": "user", "content": tool_ergebnisse})
 

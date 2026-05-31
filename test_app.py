@@ -596,6 +596,74 @@ def test_mehrere_dateien():
     )
 
 
+def test_excel_namenspruefung():
+    abschnitt("Test 14: Excel-Formeln gegen #NAME? pruefen (deutsche Funktionen)")
+    import openpyxl
+
+    # Schlechte Datei: deutsche Funktionen + Semikolon.
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws["A1"] = 1
+    ws["A2"] = 2
+    ws["A3"] = "=SUMME(A1:A2)"
+    ws["A4"] = "=ZÄHLENWENN(A1:A2,1)"
+    ws["A5"] = "=SUM(A1;A2)"  # Semikolon
+    schlecht = app.OUTPUT_DIR / "_test_namen_de.xlsx"
+    wb.save(str(schlecht))
+    probleme = app.pruefe_excel_auf_namensfehler(schlecht)
+    pruefe(any("SUMME" in p and "SUM" in p for p in probleme), "SUMME wird erkannt (-> SUM)")
+    pruefe(any("COUNTIF" in p for p in probleme), "ZÄHLENWENN wird erkannt (-> COUNTIF)")
+    pruefe(any("Semikolon" in p for p in probleme), "Semikolon wird erkannt")
+
+    # Gute Datei: englische Funktionen + Komma -> keine Beanstandung.
+    wb2 = openpyxl.Workbook()
+    ws2 = wb2.active
+    ws2["A1"] = 1
+    ws2["A2"] = 2
+    ws2["A3"] = "=SUM(A1:A2)"
+    ws2["A4"] = "=COUNTIF(A1:A2,1)"
+    ws2["A5"] = "=ROUND(A3*0.081,2)"
+    gut = app.OUTPUT_DIR / "_test_namen_en.xlsx"
+    wb2.save(str(gut))
+    pruefe(
+        app.pruefe_excel_auf_namensfehler(gut) == [],
+        "Korrekte englische Formeln: keine Beanstandung",
+    )
+
+
+def test_excel_autokorrektur():
+    abschnitt("Test 15: Automatische Korrektur deutscher Excel-Funktionen (Mock)")
+    de = (
+        'import openpyxl\nwb=openpyxl.Workbook()\nws=wb.active\nws["A1"]=1\nws["A2"]=2\n'
+        'ws["A3"]="=SUMME(A1:A2)"\nwb.save("outputs/_test_auto.xlsx")\n'
+    )
+    en = (
+        'import openpyxl\nwb=openpyxl.Workbook()\nws=wb.active\nws["A1"]=1\nws["A2"]=2\n'
+        'ws["A3"]="=SUM(A1:A2)"\nwb.save("outputs/_test_auto.xlsx")\n'
+    )
+    antworten = [
+        FakeResponse([FakeToolUse("t1", app.TOOL_NAME, {"code": de})], "tool_use"),
+        FakeResponse([FakeToolUse("t2", app.TOOL_NAME, {"code": en})], "tool_use"),
+        FakeResponse([FakeText("Die Excel-Datei ist bereit.")], "end_turn"),
+    ]
+    client = FakeClient(antworten)
+    messages = [{"role": "user", "content": "Excel bitte"}]
+    text, dateien, verbrauch = app.fuehre_konversation(client, "claude-sonnet-4-6", messages)
+
+    pruefe("_test_auto.xlsx" in dateien, "Datei wird erst nach Korrektur (englisch) geliefert")
+    hinweise = [
+        block
+        for nachricht in messages
+        if nachricht.get("role") == "user" and isinstance(nachricht.get("content"), list)
+        for block in nachricht["content"]
+        if isinstance(block, dict)
+        and block.get("type") == "tool_result"
+        and block.get("is_error")
+        and "NAME?" in block.get("content", "")
+    ]
+    pruefe(len(hinweise) >= 1, "Deutsche Funktion wird automatisch erkannt und zurueckgemeldet")
+
+
 def aufraeumen():
     """Loescht alle Testdateien (_test_*) aus den Arbeitsordnern."""
     for ordner in (app.OUTPUT_DIR, app.UPLOAD_DIR, app.THEORIE_DIR):
@@ -624,6 +692,8 @@ def main():
         test_werkzeugschleife()
         test_selbstkorrektur()
         test_mehrere_dateien()
+        test_excel_namenspruefung()
+        test_excel_autokorrektur()
     finally:
         aufraeumen()
 
